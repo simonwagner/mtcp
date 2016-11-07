@@ -33,20 +33,10 @@ fi
 
 # Next check how many devices are there in the system
 counter=0
-cd /sys/module/igb_uio/drivers/pci:igb_uio/
-for i in *
+for iface_path in `find /sys/module/igb_uio/drivers/pci:igb_uio/*/net/ -maxdepth 1 -mindepth 1 -print`
 do
-    if [[ $i == *":"* ]]
-    then
-	let "counter=$counter + 1"
-    fi
-done
-cd -
-
-# Configure each device (single-process version)
-while [ $counter -gt 0 ]
-do
-    echo "/sbin/ifconfig dpdk$(($counter - 1)) 10.0.$(( $counter - 1 )).$1 netmask 255.255.255.0 up"
-    /sbin/ifconfig dpdk$(($counter - 1)) 10.0.$(($counter - 1)).$1 netmask 255.255.255.0 up
-    let "counter=$counter - 1"
+  iface_name=`basename $iface_path`
+  echo "/sbin/ifconfig $iface_name 10.0.$(( $counter )).$1 netmask 255.255.255.0 up"
+  /sbin/ifconfig $iface_name 10.0.$(( $counter )).$1 netmask 255.255.255.0 up
+  let "counter=$counter + 1"
 done
