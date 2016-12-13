@@ -1385,7 +1385,7 @@ mtcp_setconf(const struct mtcp_conf *conf)
 }
 /*----------------------------------------------------------------------------*/
 int 
-mtcp_init(char *config_file)
+mtcp_init_private(char *context, int (*load_configuration)(char*))
 {
 	int i;
 	int ret;
@@ -1414,7 +1414,7 @@ mtcp_init(char *config_file)
 		sigint_cnt[i] = 0;
 	}
 
-	ret = LoadConfiguration(config_file);
+    ret = load_configuration(context);
 	if (ret) {
 		TRACE_CONFIG("Error occured while loading configuration.\n");
 		return -1;
@@ -1454,6 +1454,18 @@ mtcp_init(char *config_file)
 	current_iomodule_func->load_module();
 
 	return 0;
+}
+/*----------------------------------------------------------------------------*/
+int
+mtcp_init(char *config_file)
+{
+    return mtcp_init_private(config_file, LoadConfiguration);
+}
+/*----------------------------------------------------------------------------*/
+int
+mtcp_init_from_string(char *config)
+{
+    return mtcp_init_private(config, LoadConfigurationFromString);
 }
 /*----------------------------------------------------------------------------*/
 void 

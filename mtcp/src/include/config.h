@@ -13,6 +13,9 @@ int devices_attached[MAX_DEVICES];
 int 
 LoadConfiguration(char *fname);
 
+int
+LoadConfigurationFromString(char* config);
+
 /* set configurations from the setted 
    interface information */
 int

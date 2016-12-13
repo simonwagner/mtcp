@@ -613,6 +613,27 @@ LoadConfiguration(char *fname)
 	return 0;
 }
 /*----------------------------------------------------------------------------*/
+int
+LoadConfigurationFromString(char* config)
+{
+    int ret = 0;
+    char* config_cpy = strdup(config); //create a copy, because strtok changes input string
+
+    char* save_ptr = NULL;
+    char* line = strtok_r(config_cpy, "\n", &save_ptr);
+    while(line != NULL) {
+        if(ParseConfiguration(line) < 0) {
+            ret = -1;
+            break;
+        }
+        line = strtok_r(NULL, "\n", &save_ptr);
+    }
+
+    free(config_cpy);
+    return ret;
+}
+
+/*----------------------------------------------------------------------------*/
 void 
 PrintConfiguration()
 {
