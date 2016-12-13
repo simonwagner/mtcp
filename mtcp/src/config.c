@@ -546,6 +546,22 @@ ParseConfiguration(char *line)
 
 	return 0;
 }
+
+/*----------------------------------------------------------------------------*/
+void LoadDefaultConfiguration()
+{
+    /* set default configuration */
+    CONFIG.num_cores = num_cpus;
+    CONFIG.max_concurrency = 100000;
+    CONFIG.max_num_buffers = 100000;
+    CONFIG.rcvbuf_size = 8192;
+    CONFIG.sndbuf_size = 8192;
+    CONFIG.tcp_timeout = TCP_TIMEOUT;
+    CONFIG.tcp_timewait = TCP_TIMEWAIT;
+    CONFIG.num_mem_ch = 0;
+}
+/*----------------------------------------------------------------------------*/
+
 /*----------------------------------------------------------------------------*/
 int 
 LoadConfiguration(char *fname)
@@ -565,14 +581,7 @@ LoadConfiguration(char *fname)
 	}
 
 	/* set default configuration */
-	CONFIG.num_cores = num_cpus;
-	CONFIG.max_concurrency = 100000;
-	CONFIG.max_num_buffers = 100000;
-	CONFIG.rcvbuf_size = 8192;
-	CONFIG.sndbuf_size = 8192;
-	CONFIG.tcp_timeout = TCP_TIMEOUT;
-	CONFIG.tcp_timewait = TCP_TIMEWAIT;
-	CONFIG.num_mem_ch = 0;
+    LoadDefaultConfiguration();
 
 	while (1) {
 		char *p;
