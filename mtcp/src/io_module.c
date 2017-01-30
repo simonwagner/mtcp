@@ -14,6 +14,7 @@
 #include <sys/ioctl.h>
 #ifndef DISABLE_DPDK
 /* for dpdk ethernet functions (get mac addresses) */
+#include <rte_common.h>
 #include <rte_ethdev.h>
 #endif
 /* for TRACE_* */

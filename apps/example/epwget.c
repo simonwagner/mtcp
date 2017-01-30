@@ -16,8 +16,12 @@
 #include <sys/queue.h>
 #include <assert.h>
 
+#include <rte_ethdev.h>
+#include <rte_common.h>
+
 #include <mtcp_api.h>
 #include <mtcp_epoll.h>
+#include <moon_io_module.h>
 #include "cpu.h"
 #include "rss.h"
 #include "http_parsing.h"
@@ -135,6 +139,17 @@ struct wget_vars
 static struct thread_context *g_ctx[MAX_CPUS];
 static struct wget_stat *g_stat[MAX_CPUS];
 /*----------------------------------------------------------------------------*/
+uint32_t ParseIPv4(const char* str)
+{
+    int b[4];
+    sscanf(str, "%d.%d.%d.%d", b, b + 1, b + 2, b + 3);
+
+    uint32_t ipv4 = b[0] << 0 | b[1] << 8 | b[2] << 16 | b[3] << 24;
+    printf("parsed IPv4 0x%08X\n", ipv4);
+
+    return ipv4;
+}
+
 thread_context_t 
 CreateContext(int core)
 {
@@ -360,11 +375,11 @@ HandleReadEvent(thread_context_t ctx, int sockid, struct wget_vars *wv)
 
 			} else {
 				/* failed to parse response header */
-#if 0
+//#if 0
 				printf("[CPU %d] Socket %d Failed to parse response header."
 						" Data: \n%s\n", ctx->core, sockid, wv->response);
 				fflush(stdout);
-#endif
+//#endif
 				wv->recv += rd;
 				rd = 0;
 				ctx->stat.errors++;
@@ -626,12 +641,14 @@ RunWgetMain(void *arg)
 				int err;
 				socklen_t len = sizeof(err);
 
-				TRACE_APP("[CPU %d] Error on socket %d\n", 
+                printf("[CPU %d] Detected error on socket %d\n",
 						core, events[i].data.sockid);
 				ctx->stat.errors++;
 				ctx->errors++;
 				if (mtcp_getsockopt(mctx, events[i].data.sockid, 
 							SOL_SOCKET, SO_ERROR, (void *)&err, &len) == 0) {
+                    printf("[CPU %d] Error on socket %d was %d\n",
+                            core, events[i].data.sockid, err);
 					if (err == ETIMEDOUT)
 						ctx->stat.timedout++;
 				}
@@ -682,11 +699,50 @@ SignalHandler(int signum)
 		done[i] = TRUE;
 	}
 }
+
+int
+setup_dpdk(const char* program_name, struct moongen_mtcp_dpdk_config* config)
+{
+    int cpumask = 0;
+    char cpumaskbuf[10];
+    char mem_channels[5];
+
+    /* get the cpu mask */
+    for (int i = 0; i < config->num_cores; i++)
+        cpumask = (cpumask | (1 << i));
+    sprintf(cpumaskbuf, "%X", cpumask);
+    sprintf(mem_channels, "%d", config->num_mem_ch);
+
+    const char* argv[] = {
+        program_name,
+        "-c",
+        cpumaskbuf,
+        "-n",
+        mem_channels,
+        "--proc-type=auto",
+        ""
+    };
+    int ret = rte_eal_init(6, argv);
+    if(ret < 0) {
+        rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
+    }
+
+    int nr_eth_dev = rte_eth_dev_count();
+    printf("Found %d dpdk ports\n", nr_eth_dev);
+
+    if(nr_eth_dev <= 0) {
+        rte_exit(EXIT_FAILURE, "No devices found\n");
+    }
+
+
+}
+
 /*----------------------------------------------------------------------------*/
 int 
 main(int argc, char **argv)
 {
 	struct mtcp_conf mcfg;
+    struct moongen_mtcp_dpdk_config moongen_cfg;
 	int cores[MAX_CPUS];
 	int flow_per_thread;
 	int flow_remainder_cnt;
@@ -713,7 +769,8 @@ main(int argc, char **argv)
 		strncpy(host, argv[1], MAX_IP_STR_LEN);
 		strncpy(url, "/", 1);
 	}
-
+	
+    printf("host: %s\n", host);
 	daddr = inet_addr(host);
 	dport = htons(80);
 	saddr = INADDR_ANY;
@@ -727,6 +784,15 @@ main(int argc, char **argv)
 	num_cores = GetNumCPUs();
 	core_limit = num_cores;
 	concurrency = 100;
+    moongen_mtcp_set_default_config(&moongen_cfg);
+    moongen_cfg.num_cores = num_cores;
+    moongen_cfg.num_mem_ch = num_cores;
+    moongen_cfg.interfaces_count = 1;
+
+    printf("Setting up dpdk...\n");
+    setup_dpdk(argv[0], &moongen_cfg);
+
+    printf("Reading command line arguments..\n");
 	for (i = 3; i < argc - 1; i++) {
 		if (strcmp(argv[i], "-N") == 0) {
 			core_limit = atoi(argv[i + 1]);
@@ -742,6 +808,8 @@ main(int argc, char **argv)
 			 */
 			mtcp_getconf(&mcfg);
 			mcfg.num_cores = core_limit;
+            moongen_cfg.num_cores = core_limit;
+            moongen_cfg.num_mem_ch = core_limit;
 			mtcp_setconf(&mcfg);
 		} else if (strcmp(argv[i], "-c") == 0) {
 			total_concurrency = atoi(argv[i + 1]);
@@ -755,6 +823,18 @@ main(int argc, char **argv)
 			fio = TRUE;
 			strncpy(outfile, argv[i + 1], MAX_FILE_LEN);
 		}
+        else if(strcmp(argv[i], "-a") == 0) {
+            moongen_cfg.interfaces[0].ip_addr = ParseIPv4(argv[i+1]);
+            i++;
+        }
+        else if(strcmp(argv[i], "-m") == 0) {
+            moongen_cfg.interfaces[0].netmask = ParseIPv4(argv[i+1]);
+            i++;
+        }
+        else if(strcmp(argv[i], "-p") == 0) {
+            moongen_cfg.interfaces[0].dpdk_port_id = atoi(argv[i]);
+            i++;
+        }
 	}
 
 	if (total_flows < core_limit) {
@@ -777,11 +857,25 @@ main(int argc, char **argv)
 		TRACE_CONFIG("Output file: %s\n", outfile);
 	}
 
-	ret = mtcp_init("epwget.conf");
+    if(!rte_eth_dev_is_valid_port(moongen_cfg.interfaces[0].dpdk_port_id)) {
+        printf("DPDK port %d is not valid\n", moongen_cfg.interfaces[0].dpdk_port_id);
+        exit(1);
+    }
+    printf("Configuring mtcp...\n");
+    if(!rte_eth_dev_is_valid_port(moongen_cfg.interfaces[0].dpdk_port_id)) {
+        printf("DPDK port %d is not valid\n", moongen_cfg.interfaces[0].dpdk_port_id);
+        exit(1);
+    }
+    else {
+        printf("valid DPDK port\n");
+    }
+    ret = mtcp_init_with_configuration_func(&moongen_cfg, moongen_mtcp_load_config);
+
 	if (ret) {
 		TRACE_ERROR("Failed to initialize mtcp.\n");
 		exit(EXIT_FAILURE);
 	}
+    printf("done\n");
 	mtcp_getconf(&mcfg);
 	mcfg.max_concurrency = max_fds;
 	mcfg.max_num_buffers = max_fds;

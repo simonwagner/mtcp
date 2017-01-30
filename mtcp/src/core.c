@@ -1385,7 +1385,7 @@ mtcp_setconf(const struct mtcp_conf *conf)
 }
 /*----------------------------------------------------------------------------*/
 int 
-mtcp_init_private(char *context, int (*load_configuration)(char*))
+mtcp_init_private(void *context, int (*load_configuration)(void*))
 {
 	int i;
 	int ret;
@@ -1466,6 +1466,12 @@ int
 mtcp_init_from_string(char *config)
 {
     return mtcp_init_private(config, LoadConfigurationFromString);
+}
+/*----------------------------------------------------------------------------*/
+int
+mtcp_init_with_configuration_func(void *context, int (*load_configuration)(void*))
+{
+    return mtcp_init_private(context, load_configuration);
 }
 /*----------------------------------------------------------------------------*/
 void 

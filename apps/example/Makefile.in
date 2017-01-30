@@ -31,6 +31,14 @@ endif
 ifeq ($(NETMAP),1)
 LIBS += -lmtcp -lpthread -lnuma -lrt
 endif
+# moongen related library and header
+MOONGEN_FLD = ../../moongen
+MOONGEN_INC = -I${MOONGEN_FLD}/include
+MOONGEN_LIB = -L${MOONGEN_FLD}/lib -lmoongenmtcp
+MOONGEN_TARGET = ${MOONGEN_FLD}/libmtcpmoongen.a
+
+INC+= ${MOONGEN_INC}
+LIBS += ${MOONGEN_LIB} 
 
 # CFLAGS for DPDK-related compilation
 INC += ${MTCP_INC}
@@ -42,7 +50,7 @@ endif
 ifeq ($(DPDK),1)
 DPDK_LIB_FLAGS = $(shell cat @DPDKLIBPATH@/lib/ldflags.txt)
 #LIBS += -m64 -g -O3 -pthread -lrt -march=native -Wl,-export-dynamic ${MTCP_FLD}/lib/libmtcp.a -L../../dpdk/lib -Wl,-lnuma -Wl,-lmtcp -Wl,-lpthread -Wl,-lrt -Wl,-ldl -Wl,${DPDK_LIB_FLAGS}
-LIBS += -m64 -g -O3 -pthread -lrt -march=native -export-dynamic ${MTCP_FLD}/lib/libmtcp.a -L../../dpdk/lib -lnuma -lmtcp -lpthread -lrt -ldl ${DPDK_LIB_FLAGS}
+LIBS += -m64 -g -O3 -pthread -lrt -march=native -export-dynamic ${MTCP_FLD}/lib/libmtcp.a ${MOONGEN_FLD}/lib/libmoongenmtcp.a -L../../dpdk/lib -lnuma -lmtcp -lpthread -lrt -ldl ${DPDK_LIB_FLAGS}
 else
 #LIBS += -m64 -g -O3 -pthread -lrt -march=native -Wl,-export-dynamic ${MTCP_FLD}/lib/libmtcp.a -L../../dpdk/lib -Wl,-lnuma -Wl,-lmtcp -Wl,-lpthread -Wl,-lrt -Wl,-ldl -Wl,${DPDK_LIB_FLAGS}
 LIBS += -m64 -g -O3 -pthread -lrt -march=native -export-dynamic ${MTCP_FLD}/lib/libmtcp.a -L../../dpdk/lib -lnuma -lmtcp -lpthread -lrt -ldl ${DPDK_LIB_FLAGS}

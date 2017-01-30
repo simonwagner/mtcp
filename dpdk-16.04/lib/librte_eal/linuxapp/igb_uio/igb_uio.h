@@ -39,6 +39,7 @@
 #endif
 #include <rte_pci_dev_features.h>
 #include "compat.h"
+#if 0
 /*----------------------------------------------------------------------------*/
 /**
  * struct to hold adapter-specific parameters 
@@ -480,3 +481,4 @@ retrieve_dev_specs(const struct pci_device_id *id)
 	return res;
 }
 /*----------------------------------------------------------------------------*/
+#endif

@@ -16,7 +16,7 @@
 /* for delay funcs */
 #include <rte_cycles.h>
 #include <rte_errno.h>
-#define ENABLE_STATS_IOCTL		1
+//#undef ENABLE_STATS_IOCTL
 #ifdef ENABLE_STATS_IOCTL
 /* for close */
 #include <unistd.h>
