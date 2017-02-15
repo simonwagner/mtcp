@@ -1394,6 +1394,12 @@ mtcp_init_private(void *context, int (*load_configuration)(void*))
 		TRACE_CONFIG("[CAUTION] Run as root if mlock is necessary.\n");
 	}
 
+    ret = load_configuration(context);
+    if (ret) {
+        TRACE_CONFIG("Error occured while loading configuration.\n");
+        return -1;
+    }
+
 	/* getting cpu and NIC */
 	/* set to max cpus only if user has not arbitrarily set it to lower # */
 	num_cpus = (CONFIG.num_cores == 0) ? GetNumCPUs() : CONFIG.num_cores;
@@ -1414,11 +1420,6 @@ mtcp_init_private(void *context, int (*load_configuration)(void*))
 		sigint_cnt[i] = 0;
 	}
 
-    ret = load_configuration(context);
-	if (ret) {
-		TRACE_CONFIG("Error occured while loading configuration.\n");
-		return -1;
-	}
 	PrintConfiguration();
 
 	/* TODO: this should be fixed */
