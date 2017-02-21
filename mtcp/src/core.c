@@ -1040,7 +1040,9 @@ MTCPRunThread(void *arg)
 	struct mtcp_thread_context *ctx;
 
 	/* affinitize the thread to this core first */
-	mtcp_core_affinitize(cpu);
+    if(!mctx->dont_affinitize) {
+        mtcp_core_affinitize(cpu);
+    }
 
 	/* memory alloc after core affinitization would use local memory
 	   most time */
@@ -1118,28 +1120,29 @@ static int MTCPDPDKRunThread(void *arg)
 	return 0;
 }
 #endif
+
 /*----------------------------------------------------------------------------*/
-mctx_t 
-mtcp_create_context(int cpu)
+static mctx_t
+mtcp_create_context_on_lcore_with_affinity(int mtcp_cpu, int lcore, int affinitize)
 {
 	mctx_t mctx;
 	int ret;
 
-	if (cpu >=  CONFIG.num_cores) {
+    if (mtcp_cpu >=  CONFIG.num_cores) {
 		TRACE_ERROR("Failed initialize new mtcp context. "
 					"Requested cpu id %d exceed the number of cores %d configured to use.\n",
-					cpu, CONFIG.num_cores);
+                    mtcp_cpu, CONFIG.num_cores);
 		return NULL;
 	}
 
         /* check if mtcp_create_context() was already initialized */
-        if (g_logctx[cpu] != NULL) {
+        if (g_logctx[mtcp_cpu] != NULL) {
                 TRACE_ERROR("%s was already initialized before!\n",
                             __FUNCTION__);
                 return NULL;
         }
 
-	ret = sem_init(&g_init_sem[cpu], 0, 0);
+    ret = sem_init(&g_init_sem[mtcp_cpu], 0, 0);
 	if (ret) {
 		TRACE_ERROR("Failed initialize init_sem.\n");
 		return NULL;
@@ -1150,19 +1153,20 @@ mtcp_create_context(int cpu)
 		TRACE_ERROR("Failed to allocate memory for mtcp_context.\n");
 		return NULL;
 	}
-	mctx->cpu = cpu;
+    mctx->cpu = mtcp_cpu;
+    mctx->dont_affinitize = !affinitize;
 
 	/* initialize logger */
-	g_logctx[cpu] = (struct log_thread_context *)
+    g_logctx[mtcp_cpu] = (struct log_thread_context *)
 			calloc(1, sizeof(struct log_thread_context));
-	if (!g_logctx[cpu]) {
+    if (!g_logctx[mtcp_cpu]) {
 		perror("malloc");
 		TRACE_ERROR("Failed to allocate memory for log thread context.\n");
 		return NULL;
 	}
-	InitLogThreadContext(g_logctx[cpu], cpu);
-	if (pthread_create(&log_thread[cpu], 
-				NULL, ThreadLogMain, (void *)g_logctx[cpu])) {
+    InitLogThreadContext(g_logctx[mtcp_cpu], mtcp_cpu);
+    if (pthread_create(&log_thread[mtcp_cpu],
+                NULL, ThreadLogMain, (void *)g_logctx[mtcp_cpu])) {
 		perror("pthread_create");
 		TRACE_ERROR("Failed to create log thread\n");
 		return NULL;
@@ -1173,37 +1177,52 @@ mtcp_create_context(int cpu)
 #ifndef DISABLE_DPDK
 		int master;
 		master = rte_get_master_lcore();
-		if (master == cpu) {
+        if (master == mtcp_cpu) {
 			lcore_config[master].ret = 0;
 			lcore_config[master].state = FINISHED;
-			if (pthread_create(&g_thread[cpu], 
+            if (pthread_create(&g_thread[mtcp_cpu],
 					   NULL, MTCPRunThread, (void *)mctx) != 0) {
 				TRACE_ERROR("pthread_create of mtcp thread failed!\n");
 				return NULL;
 			}
 		} else
-			rte_eal_remote_launch(MTCPDPDKRunThread, mctx, cpu);
+            rte_eal_remote_launch(MTCPDPDKRunThread, mctx, lcore);
 #endif /* !DISABLE_DPDK */
 	} else {
-		if (pthread_create(&g_thread[cpu], 
+        if (pthread_create(&g_thread[mtcp_cpu],
 				   NULL, MTCPRunThread, (void *)mctx) != 0) {
 			TRACE_ERROR("pthread_create of mtcp thread failed!\n");
 			return NULL;
 		}
 	}
 
-	sem_wait(&g_init_sem[cpu]);
-	sem_destroy(&g_init_sem[cpu]);
+    sem_wait(&g_init_sem[mtcp_cpu]);
+    sem_destroy(&g_init_sem[mtcp_cpu]);
 
-	running[cpu] = TRUE;
+    running[mtcp_cpu] = TRUE;
 
 	if (mtcp_master < 0) {
-		mtcp_master = cpu;
+        mtcp_master = mtcp_cpu;
 		TRACE_INFO("CPU %d is now the master thread.\n", mtcp_master);
 	}
 
 	return mctx;
 }
+/*----------------------------------------------------------------------------*/
+
+mctx_t
+mtcp_create_context(int cpu)
+{
+    return mtcp_create_context_on_lcore_with_affinity(cpu, cpu, TRUE);
+}
+/*----------------------------------------------------------------------------*/
+
+mctx_t
+mtcp_create_context_on_lcore(int cpu, int lcore)
+{
+    return mtcp_create_context_on_lcore_with_affinity(cpu, lcore, FALSE);
+}
+
 /*----------------------------------------------------------------------------*/
 void 
 mtcp_destroy_context(mctx_t mctx)

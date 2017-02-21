@@ -155,6 +155,7 @@ struct mtcp_config
 struct mtcp_context
 {
 	int cpu;
+    int dont_affinitize;
 };
 /*----------------------------------------------------------------------------*/
 struct mtcp_sender

@@ -63,6 +63,9 @@ mtcp_core_affinitize(int cpu);
 mctx_t 
 mtcp_create_context(int cpu);
 
+mctx_t
+mtcp_create_context_on_lcore(int mtcp_cpu, int lcore);
+
 void 
 mtcp_destroy_context(mctx_t mctx);
 
