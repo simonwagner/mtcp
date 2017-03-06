@@ -29,7 +29,7 @@
 #define IP_RANGE 1
 #define MAX_IP_STR_LEN 16
 
-#define BUF_SIZE (8*1024)
+#define BUF_SIZE (1448)
 
 #define CALC_MD5SUM FALSE
 
@@ -59,6 +59,7 @@ struct nc_ctx {
     in_addr_t daddr;
     in_port_t dport;
     mctx_t mctx;
+    int ep;
     FILE* f;
 };
 
@@ -80,7 +81,7 @@ CreateContext(int core, in_addr_t daddr, in_port_t dport, FILE* f)
 
     ctx = (struct nc_ctx*)calloc(1, sizeof(struct nc_ctx));
 
-	ctx->mctx = mtcp_create_context(core);
+    ctx->mctx = mtcp_create_context_on_lcore(core, core);
 	if (!ctx->mctx) {
         fprintf(stderr, "Failed to create mtcp context.\n");
 		return NULL;
@@ -119,6 +120,17 @@ CreateConnection(struct nc_ctx* ctx)
 	
 	ret = mtcp_connect(mctx, sockid, 
 			(struct sockaddr *)&addr, sizeof(struct sockaddr_in));
+
+    if(ret < 0) {
+        return ret;
+    }
+
+    mtcp_setsock_nonblock(ctx->mctx, sockid);
+
+    struct mtcp_epoll_event ev;
+    ev.events = MTCP_EPOLLOUT;
+    ev.data.sockid = sockid;
+    mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_ADD, sockid, &ev);
 
 	return sockid;
 }
@@ -195,40 +207,88 @@ int
 RunNcMain(struct nc_ctx* ctx)
 {
     running = TRUE;
+    int maxevents = 5;
+
+    ctx->ep = mtcp_epoll_create(ctx->mctx, maxevents);
+
     int socketid = CreateConnection(ctx);
 
     if(socketid < 0) {
         fprintf(stderr, "Failed to connect\n");
+        return -1;
     }
 
     char* buffer = malloc(BUF_SIZE);
+    int buffer_offset = 0;
+
+    struct mtcp_epoll_event *events = (struct mtcp_epoll_event *) calloc(maxevents, sizeof(struct mtcp_epoll_event));
+    int nevents = 0;
 
     while(running) {
-        int bytes_read = fread(buffer, 1,BUF_SIZE, ctx->f);
-        if(bytes_read < 0) {
-            fprintf(stderr, "error reading data\n");
+        nevents = mtcp_epoll_wait(ctx->mctx, ctx->ep, events, maxevents, -1);
+
+        if(nevents < 0) {
+            printf("ERROR: mtcp_epoll_wait failed: %d\n", nevents);
             break;
         }
 
-        int bytes_send = 0;
-        while(bytes_send < bytes_read) {
-            ssize_t ret = mtcp_write(ctx->mctx, socketid, buffer, bytes_read);
-            if(errno == EAGAIN) {
-                usleep(10);
-            }
-            else if(ret < 0) {
-                fprintf(stderr, "error sending data: %d\n", errno);
-                running = false;
-                break;
-            }
-            else {
-                bytes_send += ret;
-            }
-        }
+        for (int i = 0; i < nevents && running; i++) {
+            if (events[i].events & MTCP_EPOLLERR) {
+                int err;
+                socklen_t len = sizeof(err);
 
-        if(bytes_read < BUF_SIZE) {
-            fprintf(stderr, "Finished sending data\n");
-            running = false;
+                printf("Detected error on socket!\n");
+                if (mtcp_getsockopt(ctx->mctx, events[i].data.sockid,
+                            SOL_SOCKET, SO_ERROR, (void *)&err, &len) == 0) {
+                    printf("Error on socket was %d\n", err);
+                    running = FALSE;
+                    break;
+                }
+            }
+            else if(events[i].events & MTCP_EPOLLOUT) {
+                //read data from file
+                int bytes_to_read = BUF_SIZE - buffer_offset;
+                int bytes_read = fread(buffer + buffer_offset, 1, bytes_to_read, ctx->f);
+                bool write_more = TRUE;
+
+                while(write_more && running) {
+                    if(bytes_read < 0) {
+                        fprintf(stderr, "error reading data\n");
+                        running = FALSE;
+                        break;
+                    }
+
+                    int bytes_to_write = bytes_read + buffer_offset;
+                    int bytes_written = mtcp_write(ctx->mctx, socketid, buffer, bytes_to_write);
+                    if(bytes_written < bytes_to_write) {
+                        write_more = FALSE;
+                    }
+                    if(bytes_written < 0 && errno != EAGAIN) {
+                        printf("Error, could not write data: mtcp_write returned %d\n", bytes_written);
+                        running = FALSE;
+                        break;
+                    }
+
+                    if(bytes_read < bytes_to_read) {
+                        fprintf(stderr, "Finished sending data\n");
+                        running = false;
+                        break;
+                    }
+
+                    //move unsend bytes to beginning of the buffer
+                    if(bytes_written > 0 && bytes_written < bytes_to_write) {
+                        memmove(buffer, buffer + bytes_written, BUF_SIZE - bytes_written);
+                        buffer_offset = bytes_written;
+                    }
+                    else if(bytes_written >= bytes_to_write) {
+                        buffer_offset = 0;
+                    }
+                }
+
+                if(!running) {
+                    break;
+                }
+            }
         }
     }
 
@@ -257,18 +317,7 @@ main(int argc, char **argv)
     moongen_cfg.num_cores = num_cores;
     moongen_cfg.num_mem_ch = num_cores;
     moongen_cfg.interfaces_count = 1;
-
-    /**
-     * it is important that core limit is set
-     * before mtcp_init() is called. You can
-     * not set core_limit after mtcp_init()
-     */
-    mtcp_getconf(&mcfg);
-    mcfg.num_cores = core_limit;
-    moongen_cfg.num_cores = core_limit;
-    moongen_cfg.num_mem_ch = core_limit;
-    mtcp_setconf(&mcfg);
-
+    moongen_cfg.max_concurrency = 2;
 
     printf("Reading command line arguments..\n");
     FILE* f = NULL;
@@ -340,11 +389,6 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
     printf("done\n");
-
-    mtcp_getconf(&mcfg);
-    mcfg.max_concurrency = 1;
-    mcfg.max_num_buffers = 1;
-	mtcp_setconf(&mcfg);
 
 	mtcp_register_signal(SIGINT, SignalHandler);
 
