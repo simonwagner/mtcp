@@ -354,11 +354,15 @@ mtcp_epoll_wait(mctx_t mctx, int epid,
 
 	ep->stat.calls++;
 
+    eq = ep->usr_queue;
+    eq_shadow = ep->usr_shadow_queue;
 #if SPIN_BEFORE_SLEEP
-	int spin = 0;
-	while (ep->num_events == 0 && spin < SPIN_THRESH) {
-		spin++;
-	}
+    int spin = 0;
+    struct timespec sleep_time = {0, 10};
+    while (eq->num_events == 0 && eq_shadow->num_events == 0 && spin < SPIN_THRESH) {
+        sched_yield();
+        spin++;
+    }
 #endif /* SPIN_BEFORE_SLEEP */
 
 	if (pthread_mutex_lock(&ep->epoll_lock)) {
@@ -368,9 +372,6 @@ mtcp_epoll_wait(mctx_t mctx, int epid,
 	}
 
 wait:
-	eq = ep->usr_queue;
-	eq_shadow = ep->usr_shadow_queue;
-
 	/* wait until event occurs */
 	while (eq->num_events == 0 && eq_shadow->num_events == 0 && timeout != 0) {
 
