@@ -131,7 +131,7 @@ CloseConnection(struct nc_ctx* ctx, int sockid)
 /*----------------------------------------------------------------------------*/
 
 int
-setup_dpdk(const char* program_name, struct moongen_mtcp_dpdk_config* config)
+setup_dpdk(const char* program_name, struct moongen_mtcp_dpdk_config* config, const char* netif_pci_address)
 {
     int cpumask = 0;
     char cpumaskbuf[10];
@@ -150,9 +150,26 @@ setup_dpdk(const char* program_name, struct moongen_mtcp_dpdk_config* config)
         "-n",
         mem_channels,
         "--proc-type=auto",
+        "",
+        "",
         ""
     };
-    int ret = rte_eal_init(6, argv);
+    int argc = 6;
+
+    //if netif_pci_address is given, add it to the whitelist
+    if(netif_pci_address != NULL) {
+        argv[argc] = "-w";
+        argv[argc + 1] = netif_pci_address;
+        argc += 2;
+    }
+
+    printf("Initializing dpdk with arguments:");
+    for(int i = 0; i < argc; i++) {
+        printf(" %s", argv[i]);
+    }
+    printf("\n");
+
+    int ret = rte_eal_init(argc, argv);
     if(ret < 0) {
         rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
     }
@@ -228,6 +245,7 @@ main(int argc, char **argv)
     struct moongen_mtcp_dpdk_config moongen_cfg;
     int core_limit = 1;
     int num_cores = 1;
+    const char* netif_pci_address = NULL;
 
 	if (argc < 3) {
         fprintf(stderr, "Too few arguments!\n");
@@ -251,8 +269,6 @@ main(int argc, char **argv)
     moongen_cfg.num_mem_ch = core_limit;
     mtcp_setconf(&mcfg);
 
-    printf("Setting up dpdk...\n");
-    setup_dpdk(argv[0], &moongen_cfg);
 
     printf("Reading command line arguments..\n");
     FILE* f = NULL;
@@ -280,6 +296,10 @@ main(int argc, char **argv)
             dport = htons(atoi(argv[i+1]));
             i++;
         }
+        else if(strcmp(argv[i], "-w") == 0) {
+            netif_pci_address = argv[i+1];
+            i++;
+        }
         else if(strcmp(argv[i], "-f") == 0) {
             const char* fpath = argv[i + 1];
             if(strcmp(fpath, "-") == 0) {
@@ -296,6 +316,9 @@ main(int argc, char **argv)
             i++;
         }
 	}
+
+    printf("Setting up dpdk...\n");
+    setup_dpdk(argv[0], &moongen_cfg, netif_pci_address);
 
     if(!rte_eth_dev_is_valid_port(moongen_cfg.interfaces[0].dpdk_port_id)) {
         printf("DPDK port %d is not valid\n", moongen_cfg.interfaces[0].dpdk_port_id);
