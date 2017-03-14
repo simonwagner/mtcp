@@ -24,7 +24,7 @@ struct moongen_mtcp_dpdk_config {
     int tcp_timeout;
     int tcp_timewait;
 
-    _Bool multi_process;
+    uint8_t multi_process;
 
     int interfaces_count;
     struct moongen_mtcp_interface interfaces[MOONGEN_MTCP_MAX_INTERFACES];
