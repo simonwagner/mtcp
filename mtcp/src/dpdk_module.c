@@ -236,10 +236,12 @@ dpdk_send_pkts(struct mtcp_thread_context *ctxt, int nif)
 	struct dpdk_private_context *dpc;
 	mtcp_manager_t mtcp;
 	int ret, i;
+    int portid;
 	
 	dpc = (struct dpdk_private_context *)ctxt->io_private_context;
 	mtcp = ctxt->mtcp_manager;
 	ret = 0;
+    portid = devices_attached[nif];
 	
 	/* if there are packets in the queue... flush them out to the wire */
 	if (dpc->wmbufs[nif].len >/*= MAX_PKT_BURST*/ 0) {
@@ -265,7 +267,7 @@ dpdk_send_pkts(struct mtcp_thread_context *ctxt, int nif)
 #endif
 		do {
 			/* tx cnt # of packets */
-			ret = rte_eth_tx_burst(nif, ctxt->cpu, 
+            ret = rte_eth_tx_burst(portid, ctxt->cpu,
 					       pkts, cnt);
 			pkts += ret;
 			cnt -= ret;
@@ -296,10 +298,10 @@ dpdk_get_wptr(struct mtcp_thread_context *ctxt, int nif, uint16_t pktsize)
 	mtcp_manager_t mtcp;
 	struct rte_mbuf *m;
 	uint8_t *ptr;
-	int len_of_mbuf;
+    int len_of_mbuf;
 
 	dpc = (struct dpdk_private_context *) ctxt->io_private_context;
-	mtcp = ctxt->mtcp_manager;
+    mtcp = ctxt->mtcp_manager;
 	
 	/* sanity check */
 	if (unlikely(dpc->wmbufs[nif].len == MAX_PKT_BURST))
@@ -341,6 +343,9 @@ dpdk_recv_pkts(struct mtcp_thread_context *ctxt, int ifidx)
 {
 	struct dpdk_private_context *dpc;
 	int ret;
+    int portid;
+
+    portid = devices_attached[ifidx];
 
 	dpc = (struct dpdk_private_context *) ctxt->io_private_context;
 
@@ -349,7 +354,7 @@ dpdk_recv_pkts(struct mtcp_thread_context *ctxt, int ifidx)
 		dpc->rmbufs[ifidx].len = 0;
 	}
 
-	ret = rte_eth_rx_burst((uint8_t)ifidx, ctxt->cpu,
+    ret = rte_eth_rx_burst((uint8_t)portid, ctxt->cpu,
 			       dpc->pkts_burst, MAX_PKT_BURST);
 
 	dpc->rmbufs[ifidx].len = ret;
@@ -516,7 +521,7 @@ dpdk_enable_fdir(int portid, uint8_t is_master)
 void
 dpdk_load_module(void)
 {
-	int portid, rxlcore_id, ret;
+    int i, portid, rxlcore_id, ret;
 	/* for Ethernet flow control settings */
 	struct rte_eth_fc_conf fc_conf;
 	/* setting the rss key */
@@ -548,7 +553,8 @@ dpdk_load_module(void)
 		}
 		
 		/* Initialise each port */
-		for (portid = 0; portid < num_devices_attached; portid++) {
+        for (i = 0; i < num_devices_attached; i++) {
+            portid = devices_attached[i];
 			/* init port */
 			printf("Initializing port %u... ", (unsigned) portid);
 			fflush(stdout);

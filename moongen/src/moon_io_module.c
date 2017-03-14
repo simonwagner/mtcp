@@ -31,7 +31,7 @@ moongen_mtcp_configure_interface(struct moongen_mtcp_interface* ifc)
     struct eth_table* mtcp_ifc = &CONFIG.eths[index];
 
     sprintf(mtcp_ifc->dev_name, "dpdk%d", (int)ifc->dpdk_port_id);
-    mtcp_ifc->ifindex = ifc->dpdk_port_id;
+    mtcp_ifc->ifindex = index;
     mtcp_ifc->stat_print = 0;
 
     struct ether_addr haddr;
@@ -41,7 +41,7 @@ moongen_mtcp_configure_interface(struct moongen_mtcp_interface* ifc)
     mtcp_ifc->ip_addr = ifc->ip_addr;
     mtcp_ifc->netmask = ifc->netmask;
 
-    devices_attached[num_devices_attached] = mtcp_ifc->ifindex;
+    devices_attached[num_devices_attached] = ifc->dpdk_port_id;
     num_devices_attached++;
     CONFIG.eths_num++;
 
@@ -84,6 +84,7 @@ int moongen_mtcp_load_config(void* context)
     if (!CONFIG.eths)
         return -1;
     CONFIG.eths_num = 0;
+    num_devices_attached = 0;
 
     for(int i = 0; i < config->interfaces_count; i++) {
         moongen_mtcp_configure_interface(&config->interfaces[i]);
