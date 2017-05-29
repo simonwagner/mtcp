@@ -49,7 +49,7 @@ ICMPOutput(struct mtcp_manager *mtcp, uint32_t saddr, uint32_t daddr,
 	struct icmphdr *icmph;
 	
 	icmph = (struct icmphdr *)IPOutputStandalone(mtcp, 
-			IPPROTO_ICMP, 0, saddr, daddr, sizeof(struct icmphdr) + len);
+            IPPROTO_ICMP, 0, saddr, daddr, sizeof(struct icmphdr) + len, NULL);
 	if (!icmph)
 		return -1;
 	

@@ -34,7 +34,7 @@ GetOutputInterface(uint32_t daddr)
 /*----------------------------------------------------------------------------*/
 uint8_t *
 IPOutputStandalone(struct mtcp_manager *mtcp, uint8_t protocol, 
-		uint16_t ip_id, uint32_t saddr, uint32_t daddr, uint16_t payloadlen)
+        uint16_t ip_id, uint32_t saddr, uint32_t daddr, uint16_t payloadlen, struct iphdr **iph_out)
 {
 	struct iphdr *iph;
 	int nif;
@@ -81,12 +81,14 @@ IPOutputStandalone(struct mtcp_manager *mtcp, uint8_t protocol,
 	/* otherwise calculate IP checksum in S/W */
 	if (rc == -1)
 		iph->check = ip_fast_csum(iph, iph->ihl);
-
+    if(iph_out != NULL) {
+        *iph_out = iph;
+    }
 	return (uint8_t *)(iph + 1);
 }
 /*----------------------------------------------------------------------------*/
 uint8_t *
-IPOutput(struct mtcp_manager *mtcp, tcp_stream *stream, uint16_t tcplen)
+IPOutput(struct mtcp_manager *mtcp, tcp_stream *stream, uint16_t tcplen, struct iphdr **iph_out)
 {
 	struct iphdr *iph;
 	int nif;
@@ -138,6 +140,9 @@ IPOutput(struct mtcp_manager *mtcp, tcp_stream *stream, uint16_t tcplen)
 	/* otherwise calculate IP checksum in S/W */
 	if (rc == -1)
 		iph->check = ip_fast_csum(iph, iph->ihl);
+    if(iph_out != NULL) {
+        *iph_out = iph;
+    }
 
 	return (uint8_t *)(iph + 1);
 }
