@@ -1175,17 +1175,7 @@ mtcp_create_context_on_lcore_with_affinity(int mtcp_cpu, int lcore, int affiniti
 	/* Wake up mTCP threads (wake up I/O threads) */
 	if (current_iomodule_func == &dpdk_module_func) {
 #ifndef DISABLE_DPDK
-		int master;
-		master = rte_get_master_lcore();
-        if (master == mtcp_cpu) {
-			lcore_config[master].ret = 0;
-			lcore_config[master].state = FINISHED;
-            if (pthread_create(&g_thread[mtcp_cpu],
-					   NULL, MTCPRunThread, (void *)mctx) != 0) {
-				TRACE_ERROR("pthread_create of mtcp thread failed!\n");
-				return NULL;
-			}
-		} else
+            TRACE_INFO("launching MTCPDPDKRunThread on lcore %u\n", lcore);
             rte_eal_remote_launch(MTCPDPDKRunThread, mctx, lcore);
 #endif /* !DISABLE_DPDK */
 	} else {
