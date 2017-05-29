@@ -199,8 +199,14 @@ SendTCPPacketStandalone(struct mtcp_manager *mtcp,
 	}
 		
 #if TCP_CALCULATE_CHECKSUM
-	tcph->check = TCPCalcChecksum((uint16_t *)tcph, 
-			TCP_HEADER_LEN + optlen + payloadlen, saddr, daddr);
+    int rc = 0;
+    int nif = GetOutputInterface(daddr);
+    if (mtcp->iom->dev_ioctl != NULL)
+            rc = mtcp->iom->dev_ioctl(mtcp->ctx, nif, PKT_TX_TCP_CSUM, iph);
+    /* otherwise calculate IP checksum in S/W */
+    if (rc == -1)
+        tcph->check = TCPCalcChecksum((uint16_t *)tcph,
+                                      TCP_HEADER_LEN + optlen + payloadlen, saddr, daddr);
 #endif
 
 	if (tcph->syn || tcph->fin) {
@@ -215,6 +221,7 @@ SendTCPPacket(struct mtcp_manager *mtcp, tcp_stream *cur_stream,
 		uint32_t cur_ts, uint8_t flags, uint8_t *payload, uint16_t payloadlen)
 {
 	struct tcphdr *tcph;
+    struct iphdr *iph;
 	uint16_t optlen;
 	uint8_t wscale = 0;
 	uint32_t window32 = 0;
@@ -226,7 +233,7 @@ SendTCPPacket(struct mtcp_manager *mtcp, tcp_stream *cur_stream,
 	}
 
 	tcph = (struct tcphdr *)IPOutput(mtcp, cur_stream, 
-			TCP_HEADER_LEN + optlen + payloadlen);
+            TCP_HEADER_LEN + optlen + payloadlen, &iph);
 	if (tcph == NULL) {
 		return -2;
 	}
@@ -310,9 +317,14 @@ SendTCPPacket(struct mtcp_manager *mtcp, tcp_stream *cur_stream,
 	}
 
 #if TCP_CALCULATE_CHECKSUM
-	tcph->check = TCPCalcChecksum((uint16_t *)tcph, 
-			TCP_HEADER_LEN + optlen + payloadlen, 
-			cur_stream->saddr, cur_stream->daddr);
+    int rc = 0;
+    int nif = GetOutputInterface(cur_stream->daddr);
+    if (mtcp->iom->dev_ioctl != NULL)
+            rc = mtcp->iom->dev_ioctl(mtcp->ctx, nif, PKT_TX_TCP_CSUM, iph);
+    /* otherwise calculate IP checksum in S/W */
+    if (rc == -1)
+        tcph->check = TCPCalcChecksum((uint16_t *)tcph,
+                                      TCP_HEADER_LEN + optlen + payloadlen, cur_stream->saddr, cur_stream->daddr);
 #endif
 
 	cur_stream->snd_nxt += payloadlen;
