@@ -22,7 +22,7 @@
 
 #include <mtcp_api.h>
 #include <mtcp_epoll.h>
-#include <moon_io_module.h>
+#include <moon_mtcp.h>
 
 #define MAX_CPUS 16
 
@@ -143,7 +143,7 @@ CloseConnection(struct nc_ctx* ctx, int sockid)
 /*----------------------------------------------------------------------------*/
 
 int
-setup_dpdk(const char* program_name, struct moongen_mtcp_dpdk_config* config, const char* netif_pci_address)
+setup_dpdk(const char* program_name, struct moon_mtcp_dpdk_config* config, const char* netif_pci_address)
 {
     int cpumask = 0;
     char cpumaskbuf[10];
@@ -302,7 +302,7 @@ main(int argc, char **argv)
 {
 	struct mtcp_conf mcfg;
     struct nc_ctx* ctx;
-    struct moongen_mtcp_dpdk_config moongen_cfg;
+    struct moon_mtcp_dpdk_config moon_cfg;
     int core_limit = 1;
     int num_cores = 1;
     const char* netif_pci_address = NULL;
@@ -313,11 +313,11 @@ main(int argc, char **argv)
 		return FALSE;
 	}
 
-    moongen_mtcp_set_default_config(&moongen_cfg);
-    moongen_cfg.num_cores = num_cores;
-    moongen_cfg.num_mem_ch = num_cores;
-    moongen_cfg.interfaces_count = 1;
-    moongen_cfg.max_concurrency = 2;
+    moon_mtcp_set_default_config(&moon_cfg);
+    moon_cfg.num_cores = num_cores;
+    moon_cfg.num_mem_ch = num_cores;
+    moon_cfg.interfaces_count = 1;
+    moon_cfg.max_concurrency = 2;
 
     printf("Reading command line arguments..\n");
     FILE* f = NULL;
@@ -326,15 +326,15 @@ main(int argc, char **argv)
 
     for (int i = 1; i < argc; i++) {
         if(strcmp(argv[i], "-a") == 0) {
-            moongen_cfg.interfaces[0].ip_addr = ParseIPv4(argv[i+1]);
+            moon_cfg.interfaces[0].ip_addr = ParseIPv4(argv[i+1]);
             i++;
         }
         else if(strcmp(argv[i], "-m") == 0) {
-            moongen_cfg.interfaces[0].netmask = ParseIPv4(argv[i+1]);
+            moon_cfg.interfaces[0].netmask = ParseIPv4(argv[i+1]);
             i++;
         }
         else if(strcmp(argv[i], "-p") == 0) {
-            moongen_cfg.interfaces[0].dpdk_port_id = atoi(argv[i+1]);
+            moon_cfg.interfaces[0].dpdk_port_id = atoi(argv[i+1]);
             i++;
         }
         else if(strcmp(argv[i], "-H") == 0) {
@@ -367,22 +367,22 @@ main(int argc, char **argv)
 	}
 
     printf("Setting up dpdk...\n");
-    setup_dpdk(argv[0], &moongen_cfg, netif_pci_address);
+    setup_dpdk(argv[0], &moon_cfg, netif_pci_address);
 
-    if(!rte_eth_dev_is_valid_port(moongen_cfg.interfaces[0].dpdk_port_id)) {
-        printf("DPDK port %d is not valid\n", moongen_cfg.interfaces[0].dpdk_port_id);
+    if(!rte_eth_dev_is_valid_port(moon_cfg.interfaces[0].dpdk_port_id)) {
+        printf("DPDK port %d is not valid\n", moon_cfg.interfaces[0].dpdk_port_id);
         exit(1);
     }
     printf("Configuring mtcp...\n");
-    if(!rte_eth_dev_is_valid_port(moongen_cfg.interfaces[0].dpdk_port_id)) {
-        printf("DPDK port %d is not valid\n", moongen_cfg.interfaces[0].dpdk_port_id);
+    if(!rte_eth_dev_is_valid_port(moon_cfg.interfaces[0].dpdk_port_id)) {
+        printf("DPDK port %d is not valid\n", moon_cfg.interfaces[0].dpdk_port_id);
         exit(1);
     }
     else {
         printf("valid DPDK port\n");
     }
 
-    int ret = mtcp_init_with_configuration_func(&moongen_cfg, moongen_mtcp_load_config);
+    int ret = mtcp_init_with_configuration_func(&moon_cfg, moon_mtcp_load_config);
 
 	if (ret) {
         fprintf(stderr, "Failed to initialize mtcp.\n");

@@ -1,5 +1,5 @@
 
-#include "moon_io_module.h"
+#include "moon_mtcp.h"
 
 /* std lib funcs */
 #include <stdlib.h>
@@ -20,7 +20,7 @@
 #include "tcp_in.h"
 /*----------------------------------------------------------------------------*/
 static int
-moongen_mtcp_configure_interface(struct moongen_mtcp_interface* ifc)
+moon_mtcp_configure_interface(struct moon_mtcp_interface* ifc)
 {
     int index = CONFIG.eths_num;
 
@@ -48,7 +48,7 @@ moongen_mtcp_configure_interface(struct moongen_mtcp_interface* ifc)
     return 0;
 }
 /*----------------------------------------------------------------------------*/
-void moongen_mtcp_set_default_config(struct moongen_mtcp_dpdk_config* config)
+void moon_mtcp_set_default_config(struct moon_mtcp_dpdk_config* config)
 {
     config->max_concurrency = 100000;
     config->max_num_buffers = 100000;
@@ -59,9 +59,9 @@ void moongen_mtcp_set_default_config(struct moongen_mtcp_dpdk_config* config)
     config->num_mem_ch = 0;
 }
 /*----------------------------------------------------------------------------*/
-int moongen_mtcp_load_config(void* context)
+int moon_mtcp_load_config(void* context)
 {
-    struct moongen_mtcp_dpdk_config* config = context;
+    struct moon_mtcp_dpdk_config* config = context;
 
     CONFIG.num_cores = config->num_cores;
     CONFIG.num_mem_ch = config->num_mem_ch;
@@ -87,7 +87,7 @@ int moongen_mtcp_load_config(void* context)
     num_devices_attached = 0;
 
     for(int i = 0; i < config->interfaces_count; i++) {
-        moongen_mtcp_configure_interface(&config->interfaces[i]);
+        moon_mtcp_configure_interface(&config->interfaces[i]);
     }
 
     return 0;

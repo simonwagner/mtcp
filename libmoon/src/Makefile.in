@@ -6,8 +6,8 @@ PS=@PSIO@
 DPDK=@DPDK@
 NETMAP=@NETMAP@
 LRO=@LRO@
-MOONGENMTCP_LIB_DIR=../lib
-MOONGENMTCP_LIB=libmoongenmtcp.a
+MOONMTCPMTCP_LIB_DIR=../lib
+MOONMTCPMTCP_LIB=libmoonmtcp.a
 MTCP_HDR_DIR=../../mtcp/include
 MTCP_HDR = mtcp_api.h mtcp_epoll.h
 
@@ -58,7 +58,7 @@ INC+=-iquote../../mtcp/src/include
 INC+=-iquote../../io_engine/include
 
 ### SOURCE CODE ###
-SRCS = moon_io_module.c
+SRCS = moon_mtcp.c
 
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 DEPS = $(patsubst %.c,.%.d,$(SRCS))
@@ -68,8 +68,8 @@ DEPS = $(patsubst %.c,.%.d,$(SRCS))
 all: default
 
 default: $(OBJS)
-	mkdir -p $(MOONGENMTCP_LIB_DIR)
-	ar rvs $(MOONGENMTCP_LIB_DIR)/$(MOONGENMTCP_LIB) $(OBJS)
+	mkdir -p $(MOONMTCPMTCP_LIB_DIR)
+	ar rvs $(MOONMTCPMTCP_LIB_DIR)/$(MOONMTCPMTCP_LIB) $(OBJS)
 
 $(OBJS): %.o: %.c Makefile
 	$(GCC) $(GCC_OPT) $(INC) -c $< -o $@
@@ -83,7 +83,7 @@ clean: clean-library
 	rm -f .*.d
 
 clean-library:
-	rm -f $(MOONGENMTCP_LIB_DIR)/*
+	rm -f $(MOONMTCPMTCP_LIB_DIR)/*
 
 distclean: clean
 	rm -f Makefile

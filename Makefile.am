@@ -1,2 +1,2 @@
 AUTOMAKE_OPTIONS = foreign
-SUBDIRS = mtcp/src util io_engine/lib moongen/src apps/example
+SUBDIRS = mtcp/src util io_engine/lib libmoon/src apps/example

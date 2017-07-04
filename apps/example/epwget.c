@@ -21,7 +21,7 @@
 
 #include <mtcp_api.h>
 #include <mtcp_epoll.h>
-#include <moon_io_module.h>
+#include <moon_mtcp.h>
 #include "cpu.h"
 #include "rss.h"
 #include "http_parsing.h"
@@ -701,7 +701,7 @@ SignalHandler(int signum)
 }
 
 int
-setup_dpdk(const char* program_name, struct moongen_mtcp_dpdk_config* config)
+setup_dpdk(const char* program_name, struct moon_mtcp_dpdk_config* config)
 {
     int cpumask = 0;
     char cpumaskbuf[10];
@@ -742,7 +742,7 @@ int
 main(int argc, char **argv)
 {
 	struct mtcp_conf mcfg;
-    struct moongen_mtcp_dpdk_config moongen_cfg;
+    struct moon_mtcp_dpdk_config moon_cfg;
 	int cores[MAX_CPUS];
 	int flow_per_thread;
 	int flow_remainder_cnt;
@@ -784,13 +784,13 @@ main(int argc, char **argv)
 	num_cores = GetNumCPUs();
 	core_limit = num_cores;
 	concurrency = 100;
-    moongen_mtcp_set_default_config(&moongen_cfg);
-    moongen_cfg.num_cores = num_cores;
-    moongen_cfg.num_mem_ch = num_cores;
-    moongen_cfg.interfaces_count = 1;
+    moon_mtcp_set_default_config(&moon_cfg);
+    moon_cfg.num_cores = num_cores;
+    moon_cfg.num_mem_ch = num_cores;
+    moon_cfg.interfaces_count = 1;
 
     printf("Setting up dpdk...\n");
-    setup_dpdk(argv[0], &moongen_cfg);
+    setup_dpdk(argv[0], &moon_cfg);
 
     printf("Reading command line arguments..\n");
 	for (i = 3; i < argc - 1; i++) {
@@ -808,8 +808,8 @@ main(int argc, char **argv)
 			 */
 			mtcp_getconf(&mcfg);
 			mcfg.num_cores = core_limit;
-            moongen_cfg.num_cores = core_limit;
-            moongen_cfg.num_mem_ch = core_limit;
+            moon_cfg.num_cores = core_limit;
+            moon_cfg.num_mem_ch = core_limit;
 			mtcp_setconf(&mcfg);
 		} else if (strcmp(argv[i], "-c") == 0) {
 			total_concurrency = atoi(argv[i + 1]);
@@ -824,15 +824,15 @@ main(int argc, char **argv)
 			strncpy(outfile, argv[i + 1], MAX_FILE_LEN);
 		}
         else if(strcmp(argv[i], "-a") == 0) {
-            moongen_cfg.interfaces[0].ip_addr = ParseIPv4(argv[i+1]);
+            moon_cfg.interfaces[0].ip_addr = ParseIPv4(argv[i+1]);
             i++;
         }
         else if(strcmp(argv[i], "-m") == 0) {
-            moongen_cfg.interfaces[0].netmask = ParseIPv4(argv[i+1]);
+            moon_cfg.interfaces[0].netmask = ParseIPv4(argv[i+1]);
             i++;
         }
         else if(strcmp(argv[i], "-p") == 0) {
-            moongen_cfg.interfaces[0].dpdk_port_id = atoi(argv[i]);
+            moon_cfg.interfaces[0].dpdk_port_id = atoi(argv[i]);
             i++;
         }
 	}
@@ -857,19 +857,19 @@ main(int argc, char **argv)
 		TRACE_CONFIG("Output file: %s\n", outfile);
 	}
 
-    if(!rte_eth_dev_is_valid_port(moongen_cfg.interfaces[0].dpdk_port_id)) {
-        printf("DPDK port %d is not valid\n", moongen_cfg.interfaces[0].dpdk_port_id);
+    if(!rte_eth_dev_is_valid_port(moon_cfg.interfaces[0].dpdk_port_id)) {
+        printf("DPDK port %d is not valid\n", moon_cfg.interfaces[0].dpdk_port_id);
         exit(1);
     }
     printf("Configuring mtcp...\n");
-    if(!rte_eth_dev_is_valid_port(moongen_cfg.interfaces[0].dpdk_port_id)) {
-        printf("DPDK port %d is not valid\n", moongen_cfg.interfaces[0].dpdk_port_id);
+    if(!rte_eth_dev_is_valid_port(moon_cfg.interfaces[0].dpdk_port_id)) {
+        printf("DPDK port %d is not valid\n", moon_cfg.interfaces[0].dpdk_port_id);
         exit(1);
     }
     else {
         printf("valid DPDK port\n");
     }
-    ret = mtcp_init_with_configuration_func(&moongen_cfg, moongen_mtcp_load_config);
+    ret = mtcp_init_with_configuration_func(&moon_cfg, moon_mtcp_load_config);
 
 	if (ret) {
 		TRACE_ERROR("Failed to initialize mtcp.\n");

@@ -5,14 +5,14 @@
 
 #define MOONGEN_MTCP_MAX_INTERFACES 16
 
-struct moongen_mtcp_interface {
+struct moon_mtcp_interface {
     uint32_t ip_addr;
     uint32_t netmask;
 
     uint8_t dpdk_port_id;
 };
 
-struct moongen_mtcp_dpdk_config {
+struct moon_mtcp_dpdk_config {
     int num_cores;
     int max_concurrency;
     int max_num_buffers;
@@ -27,10 +27,10 @@ struct moongen_mtcp_dpdk_config {
     uint8_t multi_process;
 
     int interfaces_count;
-    struct moongen_mtcp_interface interfaces[MOONGEN_MTCP_MAX_INTERFACES];
+    struct moon_mtcp_interface interfaces[MOONGEN_MTCP_MAX_INTERFACES];
 };
 
-void moongen_mtcp_set_default_config(struct moongen_mtcp_dpdk_config* config);
-int moongen_mtcp_load_config(void* context);
+void moon_mtcp_set_default_config(struct moon_mtcp_dpdk_config* config);
+int moon_mtcp_load_config(void* context);
 
 #endif //__MOON_IO_MODULE_H_

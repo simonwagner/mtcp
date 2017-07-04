@@ -93,7 +93,7 @@ fi
 AM_INIT_AUTOMAKE(mtcp, 3)
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT(mtcp/src/Makefile)
-AC_OUTPUT(moongen/src/Makefile)
+AC_OUTPUT(libmoon/src/Makefile)
 AC_OUTPUT(apps/example/Makefile)
 AC_OUTPUT(apps/netcat/Makefile)
 AC_OUTPUT(util/Makefile)
