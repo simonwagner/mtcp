@@ -75,13 +75,13 @@ uint32_t ParseIPv4(const char* str)
 }
 
 struct nc_ctx*
-CreateContext(int core, in_addr_t daddr, in_port_t dport, FILE* f)
+CreateContext(int core, int lcore, in_addr_t daddr, in_port_t dport, FILE* f)
 {
     struct nc_ctx* ctx;
 
     ctx = (struct nc_ctx*)calloc(1, sizeof(struct nc_ctx));
 
-    ctx->mctx = mtcp_create_context_on_lcore(core, core);
+    ctx->mctx = mtcp_create_context_on_lcore(core, lcore);
 	if (!ctx->mctx) {
         fprintf(stderr, "Failed to create mtcp context.\n");
 		return NULL;
@@ -150,7 +150,7 @@ setup_dpdk(const char* program_name, struct moon_mtcp_dpdk_config* config, const
     char mem_channels[5];
 
     /* get the cpu mask */
-    for (int i = 0; i < config->num_cores; i++)
+    for (int i = 0; i < config->num_cores + 1; i++)
         cpumask = (cpumask | (1 << i));
     sprintf(cpumaskbuf, "%X", cpumask);
     sprintf(mem_channels, "%d", config->num_mem_ch);
@@ -392,7 +392,7 @@ main(int argc, char **argv)
 
 	mtcp_register_signal(SIGINT, SignalHandler);
 
-    ctx = CreateContext(0, daddr, dport, f);
+    ctx = CreateContext(0, 1, daddr, dport, f);
     if(ctx == NULL) {
         fprintf(stderr, "Failed to create context\n");
     }
